@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <link href="../css/jquery.reversi.css" rel="stylesheet" type="text/css" media="all">
+    <title>Artificial Intelligence | jquery.reversi.js</title>
+
+    <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+    <script type="text/javascript">google.load("jquery", "1.4.0");</script>
+
+    <script type="text/javascript" src="../js/jquery.reversi.js"></script>
+    <script type="text/javascript">
+      $(function() {
+        var reinforcementLearning = function(board_element, board, cpu_color) {
+          console.log("Learning function!")
+        }
+        $('#reversi').reversi({cpu: reinforcementLearning, my_color : 'white', width: 480, height: 480});
+      });
+    </script>
+  </head>
+  <body>
+    <div id="wrapper">
+      <div id="header">
+        <h1>
+          <a id="top" href="http://endel.me/">
+            Endel Dreyer | Reversi Artificial Intelligence
+          </a>
+        </h1>
+      </div>
+
+
+      <h2>jquery.reversi.js</h2>
+      <p>
+        Machine Learning Implementation:
+        <a href="https://github.com/endel/jquery.reversi.js">https://github.com/endel/jquery.reversi.js</a>
+
+        <br />
+        Original Reversi Script:
+        <a href="https://github.com/yamitake/jquery.reversi.js">https://github.com/yamitake/jquery.reversi.js</a>
+      </p>
+
+      <h2>Reinforcement Learning</h2>
+      <div id="reversi"></div>
+
+      <div id="footer">
+        <p>
+          Copyright (C) Endel Dreyer All Rights Reserved.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
+

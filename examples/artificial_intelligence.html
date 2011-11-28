@@ -11,10 +11,39 @@
     <script type="text/javascript" src="../js/jquery.reversi.js"></script>
     <script type="text/javascript">
       $(function() {
-        var reinforcementLearning = function(board_element, board, cpu_color) {
-          console.log("Learning function!")
+        /**
+          * Reset previous game and render a new one
+          */
+        function newGame() {
+          return $('#reversi').reversi({
+            ai: $.reversi.ai.reinforcementLearning,
+            my_color : 'white',
+            width: 480,
+            height: 480
+          });
         }
-        $('#reversi').reversi({cpu: reinforcementLearning, my_color : 'white', width: 480, height: 480});
+
+        /**
+          * A.I. Learning Iterations
+          * Make the machine play with himself
+          */
+        function nextTurn () {
+          var iterations = Number($('input#iterations').val());
+          var sleepMilliseconds = Number($('input#milliseconds').val());
+
+          $.reversi.ai.reinforcementLearning.action( "#reversi", $("#reversi").data("board"), $("#reversi").attr("turn") );
+          if (!$.fn.reversi.isFinished("#reversi")) {
+            setTimeout(nextTurn, sleepMilliseconds+1);
+          } else if (iterations > 0) {
+            newGame();
+            $('input#iterations').val( $('input#iterations').val() - 1 );
+            nextTurn();
+          }
+        }
+
+        $('button#learn').click(nextTurn);
+        $('button#new-game').click(newGame);
+        $('button#new-game').click();
       });
     </script>
   </head>
@@ -40,6 +69,15 @@
       </p>
 
       <h2>Reinforcement Learning</h2>
+      <div id="options">
+        <p>
+          Learn iterations: <input type="text" id="iterations" value="50" size="2" />
+          Milliseconds by turn: <input type="text" id="milliseconds" value="0" size="2" />
+          <button id="learn">Learn!</button>
+          <br />
+          <button id="new-game">New game</button>
+        </p>
+      </div>
       <div id="reversi"></div>
 
       <div id="footer">

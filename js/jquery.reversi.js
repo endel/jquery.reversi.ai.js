@@ -1,5 +1,5 @@
 /**
- jquery.reversi.js ver1.0
+ jquery.reversi.js ver 1.0
 
 The MIT License
 
@@ -24,7 +24,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
  */
 (function($) {
-  /** セルに何も置かれていない状態 */
+  /** Not placed any conditions on the cell */
   var CLASS_BLANK = 'blank';
   var CLASS_BLACK = 'black';
   var CLASS_WHITE = 'white';
@@ -32,93 +32,254 @@ THE SOFTWARE.
   var CLASS_MESSAGE_BAR    = 'message_bar';
   var CLASS_MESSAGE_DIALOG = 'message_dialog';
 
-  /** 石が置かれた時のイベント */
+  /** Event when a stone is placed */
   var EVENT_REVERSI_PUT = 'reversi_put';
 
-  /** alert message */
+  /** Alert message */
   var MESSAGE_CANT_PUT  = 'It is not possible to put it there.';
 
+  /** Shared variables and methods */
+  $.reversi = {
+    /* Artificial Intelligence */
+    ai: {
+      /**
+       * Default reversi AI
+       * Priority to the edges or get a random action
+       *
+       * Implemented by yapr
+       */
+      default: {
+        action: function(board_element, board, aiColor) {
+          // Keep in hands all possibilities
+          var keepStrategy = new Array();
+          cols = board.length;
+          rows = board[0].length;
+          for (var i = 0; i < cols; i++) {
+            for (var k = 0; k < rows; k++) {
+              if (board[i][k].hasClass(CLASS_BLANK)) {
+                // Keep in hands if there is a place to put
+                if (canPut(board, aiColor, i, k)) {
+                  // Priority to the edges
+                  if ((i == 0 && k== 0) ||
+                      (i == (cols - 1) && k == 0) ||
+                      (i == (cols - 1) && k == (rows - 1)) ||
+                      (i == 0 && k == (rows -1))) {
+                    return triggerPut(board_element, i, k);
+                  }
+                  keepStrategy[keepStrategy.length] = {col:i, row:k};
+                }
+              }
+            }
+          }
+
+          var stragy = keepStrategy[parseInt(Math.random()*keepStrategy.length)];
+          setTimeout(function() { triggerPut(board_element, stragy.col, stragy.row) }, 300);
+        }
+      },
+
+      /*
+       * Reinforcement Learning AI
+       */
+      reinforcementLearning: {
+        rewards: { 'white': {}, 'black': {} },
+
+        /**
+         * Trigger to put piece at a random possible position
+         * It returns the position selected to act
+         * @return Object
+         */
+        randomAction: function(board_element, board, aiColor) {
+          var keepStrategy = new Array();
+          cols = board.length;
+          rows = board[0].length;
+          for (var i = 0; i < cols; i++) {
+            for (var k = 0; k < rows; k++) {
+              if (board[i][k].hasClass(CLASS_BLANK)) {
+                if (canPut(board, aiColor, i, k)) {
+                  keepStrategy[keepStrategy.length] = {col:i, row:k};
+                }
+              }
+            }
+          }
+          var stragy = keepStrategy[parseInt(Math.random()*keepStrategy.length)];
+          triggerPut(board_element, stragy.col, stragy.row);
+          return stragy;
+        },
+
+        /**
+         * Act using Reinforcement Learning
+         * If knoweledge database isn't prepared, populate it using random actions
+         */
+        action: function(board_element, board, aiColor) {
+          var self = $.reversi.ai.reinforcementLearning;
+
+          var boardString = dumpBoard(board);
+
+          var stats = self.getStats(board_element, board);
+          if (self.rewards[aiColor][boardString]) {
+            // TODO: value function to evaluate more deeper
+          } else {
+            self.randomAction(board_element, board, aiColor);
+          }
+
+          var newStats = self.getStats(board_element, board);
+          var reward = self.getReward(stats, newStats, aiColor);
+        },
+
+        /**
+         * getStats
+         * return count stats of black / white pieces on the board
+         *
+         *  Containing
+         *    - count total pieces of each color on the board
+         *    - count edge pieces of each color
+         *    - count corner pieces of each color
+         *
+         * @return Object
+         */
+        getStats: function(board_element, board) {
+          var stats = {};
+          var colors = [CLASS_WHITE, CLASS_BLACK];
+
+          var cols = board.length;
+          var rows = board[0].length;
+
+          for (var i=0;i<colors.length;i++) {
+            var color = colors[i];
+            stats[color] = {
+              total: $(board_element).find('.' + CLASS_WHITE).length,
+              edges: $(board_element).find("." + color + "[col=0], ." + color + "[row=0], ." + color + "[col="+cols+"], ." + color + "[row="+rows+"]").length,
+              corners: $(board_element).find("." + color + "[col=0][row=0], ." + color + "[col="+(cols-1)+"][row="+(rows-1)+"]").length
+            }
+          }
+          return stats;
+        },
+
+        /**
+         * Calculate the difference between stats returned by getStats
+         * @return Object
+         */
+        diffStats: function(previousColorStats, afterColorStats) {
+          return {
+            total: previousColorStats.total - afterColorStats.total,
+            edges: previousColorStats.edges - afterColorStats.edges,
+            corners: previousColorStats.corners - afterColorStats.corners
+          }
+        },
+
+        /**
+         * Estimate a reward for the choice made by A.I.
+         * @return Number
+         */
+        getReward: function(previousStats, afterStats, aiColor) {
+          var self = $.reversi.ai.reinforcementLearning;
+          var otherColor = (aiColor == CLASS_BLACK) ? CLASS_WHITE : CLASS_BLACK;
+
+          var aiStats = self.diffStats(previousStats[aiColor], afterStats[aiColor]);
+          var otherStats = self.diffStats(previousStats[otherColor], afterStats[otherColor]);
+
+          // TODO
+          // return (aiStats / );
+        }
+
+      }
+    }
+  }
+
+  /* Reversi Implementation */
   $.fn.reversi = function(options){
     /**
-     * default Options
+     * Default options
      */
     var defaults ={
-      cpu   : cpuTurn, //cpuを使用するか
-      my_color : 'black' , //black or white
-      cols  : 8   , //マス(横)
-      rows  : 8   , //マス(縦)
-      width : 296 , //縦幅
-      height: 296   //横幅
+      ai : $.reversi.ai.default, // artificial intelligence, use 'false' to human controller
+      my_color : 'black', //black or white
+      cols  : 8  , // Number of columns
+      rows  : 8  , // Number of rows
+      width : 296, // Width (pixels)
+      height: 296  // Height (pixels)
     };
 
     return this.each(function(){
-      var opts = $.extend(defaults , options);
+      var opts = $.extend(defaults, options);
+
+      // Clear previous data
+      $(this).unbind(EVENT_REVERSI_PUT);
+      $(this).empty();
 
       //styleの設定
       $(this).addClass('reversi_board');
       $(this).width(opts.width);
       $(this).height(opts.height);
 
-      /** reversi盤[][] */
-      var board = initBoard(opts , this);
-      //infomation display component
-      var _messagebar = createMessageBar(this , opts.width);
-      var _messageDialog = createMessageDialog(this , opts.width);
+      /** Bidimensional Reversi Board */
+      var board = initBoard(opts, this);
+      $(this).data('board', board);
+
+      // infomation display component
+      var _messagebar = createMessageBar(this, opts.width);
+      var _messageDialog = createMessageDialog(this, opts.width);
       var turn = CLASS_BLACK;
 
-      //盤が押されたときの処理
-      $(this).bind(EVENT_REVERSI_PUT , function(e , data){
+      // What happens when the panel is pressed
+      $(this).bind(EVENT_REVERSI_PUT, function(e, data){
         //ひっくり返せないので置けない。
-        if(!canPut(board , turn , data.col , data.row)){
-          showMessage(MESSAGE_CANT_PUT , _messagebar);
+        if(!canPut(board, turn, data.col, data.row)){
+          showMessage(MESSAGE_CANT_PUT, _messagebar);
           return;
         }
 
-        //石を置く
-        upsets(board , turn , data.col , data.row);
+        // Place the stone
+        upsets(board, turn, data.col, data.row);
 
-        //終了判定
-        if(isFinish(this)){
+        // Termination decision
+        if($.fn.reversi.isFinished(this)){
           var black = $(this).find('.' + CLASS_BLACK).length;
           var white = $(this).find('.' + CLASS_WHITE).length;
 
-          //勝ちの判定
-          var text = '<h5>' + ((black < white) ? 'white' : 'black') +  ' win!!</h5>';
+          // Determining the winner
+          var text = '<h2>' + ((black < white) ? 'White' : 'Black') +  ' win!! (' + black + ' / ' + white + ')</h2>';
           if(black == white){
-            text = '<h5>drow</h5>';
+            text = '<h2>Draw game!</h2>';
           }
-          text += '<p>It is reload when playing a game again as for a browser. </p>';
 
-          showDialog(text , _messageDialog);
+          showDialog(text, _messageDialog);
           return;
         }
 
-        //相手のターンにチェンジ
-        turn = nextTurn(board , (turn == CLASS_BLACK) ? CLASS_WHITE : CLASS_BLACK , _messagebar);
+        // Change in opponent's turn
+        turn = nextTurn(board, (turn == CLASS_BLACK) ? CLASS_WHITE : CLASS_BLACK, _messagebar);
+        $(this).attr('turn', turn);
 
-        if(opts.cpu != false && turn != opts.my_color){
-          if ($.isFunction(opts.cpu))
-            opts.cpu.apply(this, [this, board, turn]);
+        if(opts.ai != false && turn != opts.my_color){
+          opts.ai.action.apply(this, [this, board, turn]);
         }
       });
 
-      //先手が白の場合
-      if(opts.cpu != false && opts.my_color == CLASS_WHITE){
-        if ($.isFunction(opts.cpu))
-          opts.cpu.apply(this, [this, board, turn]);
+      // If the white sails
+      if(opts.ai != false && opts.my_color == CLASS_WHITE){
+        opts.ai.action.apply(this, [this, board, turn]);
       }
     });
   };
 
   /**
-   * ボードの初期化処理
-   * 真ん中に黒と白のコマを配置する
+   * No more blank space left?
+   * @returns Boolean
+   */
+  $.fn.reversi.isFinished = function(board_elements) {
+    return (0 == $(board_elements).find('.' + CLASS_BLANK).length);
+  }
+
+  /**
+   * Initialization of the board
+   * Placing a piece of black and white in the middle
    *
    * @params cols
    * @params rows
    * @return
    */
-  function initBoard(opts , board_element){
+  function initBoard(opts, board_element){
     var board = [];
     var cols = opts.cols;
     var rows = opts.rows;
@@ -141,9 +302,9 @@ THE SOFTWARE.
         }
 
         board[i][k] = $("<div/>", {
-          "class": style_name ,
-          "col"  : i ,
-          "row"  : k ,
+          "class": style_name,
+          "col"  : i,
+          "row"  : k,
           "style": 'width:' + cell_width + 'px;height:' + cell_height + 'px;'
         }).appendTo(board_element);
       }
@@ -152,9 +313,9 @@ THE SOFTWARE.
     $(board_element).click(function(e){
       var target = $(e.target);
 
-      target.parent().trigger(EVENT_REVERSI_PUT ,
+      target.parent().trigger(EVENT_REVERSI_PUT,
                               {
-                                'col' : target.attr('col') ,
+                                'col' : target.attr('col'),
                                 'row' : target.attr('row')
                               }
                              );
@@ -164,110 +325,83 @@ THE SOFTWARE.
   }
 
   /**
-   * ゲームが終わっているか
-   * @returns boolean
+   * Place the stone upside down around the stone.
    */
-  function isFinish(board_elements){
-    return (0 == $(board_elements).find('.' + CLASS_BLANK).length);
-  }
-
-  /**
-   * 対戦モード時にcpuが手を選択し、メインに置く手を設定する。
-   * とりあえず、置ける所を見つけたら置く。
-   */
-  function cpuTurn(board_element , board , cpu_color){
-    var col;
-    var row;
-
-    //考えられる手をキープ
-    var keepStrategy = new Array();
-    cols = board.length;
-    rows = board[0].length;
-    for(var i = 0; i < cols; i++){
-      for(var k = 0; k < rows; k++){
-        if(board[i][k].hasClass(CLASS_BLANK)){
-          //置く場所があった場合手をキープ
-          if(canPut(board , cpu_color , i , k)){
-            //端における場合は優先的に置く
-            if((i == 0 && k== 0)            ||
-               (i == (cols - 1) && k == 0) ||
-                 (i == (cols - 1) && k == (rows - 1)) ||
-                   (i == 0 && k == (rows -1))){
-              return $(board_element).trigger(EVENT_REVERSI_PUT ,
-                                              { 'col' : i ,
-                                                'row' : k
-                                              });
-            }
-
-            keepStrategy[keepStrategy.length] = {col:i , row:k};
-          }
-        }
-      }
-    }
-
-    var stragy = keepStrategy[parseInt(Math.random()*keepStrategy.length)];
-    setTimeout(function() {
-      $(board_element).trigger(EVENT_REVERSI_PUT ,
-                               { 'col' : stragy.col ,
-                                 'row' : stragy.row }
-                              );
-    }, 300);
-  }
-
-  /**
-   * 石を置いて周りの石をひっくり返す。
-   */
-  function upsets(board , style_name , col , row){
+  function upsets(board, style_name, col, row){
     var firstPut = board[col][row];
     firstPut.removeClass(CLASS_BLANK);
     firstPut.addClass(style_name);
 
     var reverseElements = new Array();
-    $.merge(reverseElements , findReverseElements(board , style_name , col , row ,  0 , -1 , false));
-    $.merge(reverseElements , findReverseElements(board , style_name , col , row ,  1 , -1 , false));
-    $.merge(reverseElements , findReverseElements(board , style_name , col , row ,  1 ,  0 , false));
-    $.merge(reverseElements , findReverseElements(board , style_name , col , row ,  1 ,  1 , false));
-    $.merge(reverseElements , findReverseElements(board , style_name , col , row ,  0 ,  1 , false));
-    $.merge(reverseElements , findReverseElements(board , style_name , col , row , -1 ,  1 , false));
-    $.merge(reverseElements , findReverseElements(board , style_name , col , row , -1 ,  0 , false));
-    $.merge(reverseElements , findReverseElements(board , style_name , col , row , -1 , -1 , false));
+    $.merge(reverseElements, findReverseElements(board, style_name, col, row,  0, -1, false));
+    $.merge(reverseElements, findReverseElements(board, style_name, col, row,  1, -1, false));
+    $.merge(reverseElements, findReverseElements(board, style_name, col, row,  1,  0, false));
+    $.merge(reverseElements, findReverseElements(board, style_name, col, row,  1,  1, false));
+    $.merge(reverseElements, findReverseElements(board, style_name, col, row,  0,  1, false));
+    $.merge(reverseElements, findReverseElements(board, style_name, col, row, -1,  1, false));
+    $.merge(reverseElements, findReverseElements(board, style_name, col, row, -1,  0, false));
+    $.merge(reverseElements, findReverseElements(board, style_name, col, row, -1, -1, false));
 
     $(reverseElements).each(function(){
-      this.attr('class' , style_name);
+      this.attr('class', style_name);
     });
   }
 
   /**
-   * 次のターンの色を決定する。
-   * 全く置く場所がなかった場合はパスとなり相手のターンとなる。
+   * To determine the color of your next turn.
+   * If there is no place to put the opponent at all turns and the path becomes.
    */
-  function nextTurn(board , nextTurn , _messagebar){
+  function nextTurn(board, nextTurnColor, _messagebar){
     cols = board.length;
     rows = board[0].length;
     for(var i = 0; i < cols; i++){
       for(var k = 0; k < cols; k++){
         if(board[i][k].hasClass(CLASS_BLANK)){
-          //置く場所があった場合、相手のターンになる
-          if(canPut(board , nextTurn , i , k)){
-            return nextTurn;
+          // If the place had become a party to turn
+          if(canPut(board, nextTurnColor, i, k)){
+            return nextTurnColor;
           }
         }
       }
     }
 
     //path
-    showMessage(nextTurn + ' path.' , _messagebar);
-    return (nextTurn == CLASS_BLACK) ? CLASS_WHITE : CLASS_BLACK;
+    showMessage(nextTurnColor + ' path.', _messagebar);
+    return (nextTurnColor == CLASS_BLACK) ? CLASS_WHITE : CLASS_BLACK;
   }
 
   /**
-   * 石を指定の位置に置くことが出来るかどうか
-   *
-   * 石が置ける条件:
-   * 隣あわせ（縦、横、斜め）に違う色の石があり、
-   * 対角線上に自分の色があること。
+   * Convert board data into String
+   * Used on Artificial Intelligence to map learning
    */
-  function canPut(board , class_color , col , row){
+  function dumpBoard(board) {
+    var columns = [];
+    var ncols = board.length;
+    for(var i = 0; i < ncols; i++){
+      var lines = []
+      var nrows = board[i].length;
+      for(var j = 0; j < nrows; j++){
+        var color = 0;
+        if (board[i][j].hasClass(CLASS_BLACK)) {
+          color = 1;
+        } else if (board[i][j].hasClass(CLASS_WHITE)) {
+          color = 2;
+        }
+        lines.push(color)
+      }
+      columns.push(lines)
+    }
+    return columns.toString();
+  }
+
+  /**
+   * Whether you can specify the placement of stones
+   *
+   * Stones placed conditions:
+   * Next match (vertical, horizontal, diagonal) with different colored stones,
+   * That his color on the diagonal.
+   */
+  function canPut(board, class_color, col, row){
     //isBlank
     if(!board[col][row].hasClass(CLASS_BLANK)){
       return false;
@@ -275,23 +409,23 @@ THE SOFTWARE.
 
     var canReverseArray = new Array();
 
-    return $.merge(canReverseArray , findReverseElements(board , class_color , col , row ,  0 , -1)).length
-    || $.merge(canReverseArray , findReverseElements(board , class_color , col , row ,  0 , -1)).length
-    || $.merge(canReverseArray , findReverseElements(board , class_color , col , row ,  1 , -1)).length
-    || $.merge(canReverseArray , findReverseElements(board , class_color , col , row ,  1 ,  0)).length
-    || $.merge(canReverseArray , findReverseElements(board , class_color , col , row ,  1 ,  1)).length
-    || $.merge(canReverseArray , findReverseElements(board , class_color , col , row ,  0 ,  1)).length
-    || $.merge(canReverseArray , findReverseElements(board , class_color , col , row , -1 ,  1)).length
-    || $.merge(canReverseArray , findReverseElements(board , class_color , col , row , -1 ,  0)).length
-    || $.merge(canReverseArray , findReverseElements(board , class_color , col , row , -1 , -1)).length;
+    return ($.merge(canReverseArray, findReverseElements(board, class_color, col, row,  0, -1)).length ||
+            $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  0, -1)).length ||
+            $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  1, -1)).length ||
+            $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  1,  0)).length ||
+            $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  1,  1)).length ||
+            $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  0,  1)).length ||
+            $.merge(canReverseArray, findReverseElements(board, class_color, col, row, -1,  1)).length ||
+            $.merge(canReverseArray, findReverseElements(board, class_color, col, row, -1,  0)).length ||
+            $.merge(canReverseArray, findReverseElements(board, class_color, col, row, -1, -1)).length);
   }
 
   /**
-   * 指定された位置から、支持された方向に対して、
-   * ひっくり返すことのできる石(element)を返す
+   * From the specified position and direction favored
+   * Returns Stones that can overturn
    * @return Array
    */
-  function findReverseElements(board , style_name , current_col , current_row , advances_col_index , advances_row_index){
+  function findReverseElements(board, style_name, current_col, current_row, advances_col_index, advances_row_index){
     var reverseArray = new Array();
     var max_col = board.length -1;
     var max_row = board[0].length - 1;
@@ -300,7 +434,7 @@ THE SOFTWARE.
       var col = parseInt(current_col) + advances_col_index * i;
       var row = parseInt(current_row) + advances_row_index * i;
 
-      //端まで行った場合
+      // If you went to the edge
       if(col > max_col
          || col < 0
        || row > max_row
@@ -308,7 +442,7 @@ THE SOFTWARE.
          break;
        }
 
-       //隣接する石が同じだった場合
+       // If it has the same adjacent stones
        var div = board[col][row];
        if(div.hasClass(CLASS_BLANK)
           || (i == 1 && div.hasClass(style_name))){
@@ -316,11 +450,11 @@ THE SOFTWARE.
           }
 
           if(div.hasClass(style_name)){
-            //一つ目以降で対角線に自分の色が合ったらreturn
+            // The color of his return there later in the first diagonal
             return reverseArray;
             break;
-          }else{
-            //ひっくり返す石をkeepする.
+          } else {
+            // To keep the stone upside down.
             reverseArray[reverseArray.length] = div;
           }
     }
@@ -329,41 +463,48 @@ THE SOFTWARE.
   }
 
   /**
-   * メッセージ領域を生成する
+   * Trigger EVENT_REVERSI_PUT
+   */
+  function triggerPut(board_element, col, row) {
+    return $(board_element).trigger(EVENT_REVERSI_PUT, { 'col' : col, 'row' : row });
+  }
+
+  /**
+   * To generate the message area
    * @returns Element
    */
-  function createMessageBar(board_element , width){
+  function createMessageBar(board_element, width){
     //statusmessage
     return $("<div/>", {
-      "class": CLASS_MESSAGE_BAR ,
+      "class": CLASS_MESSAGE_BAR,
       "style": "display:none;width:" + eval(width - 8) + "px;"
     }).appendTo(board_element);
   }
 
   /**
-   * ダイアログ領域を生成する
+   * To generate the dialog area
    */
-  function createMessageDialog(board_element , width){
+  function createMessageDialog(board_element, width){
     //statusmessage
     return $("<div/>", {
-      "class": CLASS_MESSAGE_DIALOG ,
+      "class": CLASS_MESSAGE_DIALOG,
       "style": "display:none;width:" + width * 2/3 + "px;left:" + width / 6  + "px;"
     }).appendTo(board_element);
   }
 
   /**
-   * 盤内にメッセージを表示する。
+   * To view the message in the panel.
    */
-  function showMessage(text , _messagebar){
+  function showMessage(text, _messagebar){
     _messagebar.stop().css("opacity", 1)
     .text(text)
     .fadeIn(30).fadeOut(1800);
   }
 
   /**
-   * ダイアログを表示する。
+   * To display the dialog.
    */
-  function showDialog(text , elem){
+  function showDialog(text, elem){
     $(elem).closest("." + CLASS_MESSAGE_DIALOG)
     .stop()
     .css("opacity", 1)

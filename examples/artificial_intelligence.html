@@ -27,21 +27,21 @@
           * A.I. Learning Iterations
           * Make the machine play with himself
           */
-        function nextTurn () {
+        function playNextTurn() {
           var iterations = Number($('input#iterations').val());
           var sleepMilliseconds = Number($('input#milliseconds').val());
 
-          $.reversi.ai.reinforcementLearning.action( "#reversi", $("#reversi").data("board"), $("#reversi").attr("turn") );
           if (!$.fn.reversi.isFinished("#reversi")) {
-            setTimeout(nextTurn, sleepMilliseconds+1);
+            $.reversi.ai.reinforcementLearning.action( "#reversi", $("#reversi").data("board"), $("#reversi").attr("turn") );
+            setTimeout(playNextTurn, sleepMilliseconds+1);
           } else if (iterations > 0) {
             newGame();
             $('input#iterations').val( $('input#iterations').val() - 1 );
-            nextTurn();
+            playNextTurn();
           }
         }
 
-        $('button#learn').click(nextTurn);
+        $('button#learn').click(playNextTurn);
         $('button#new-game').click(newGame);
         $('button#new-game').click();
       });

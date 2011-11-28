@@ -72,8 +72,8 @@ THE SOFTWARE.
             }
           }
 
-          var stragy = keepStrategy[parseInt(Math.random()*keepStrategy.length)];
-          setTimeout(function() { triggerPut(board_element, stragy.col, stragy.row) }, 300);
+          var strategy = keepStrategy[parseInt(Math.random()*keepStrategy.length)];
+          setTimeout(function() { triggerPut(board_element, strategy.col, strategy.row) }, 300);
         }
       },
 
@@ -101,9 +101,12 @@ THE SOFTWARE.
               }
             }
           }
-          var stragy = keepStrategy[parseInt(Math.random()*keepStrategy.length)];
-          triggerPut(board_element, stragy.col, stragy.row);
-          return stragy;
+          var strategy = keepStrategy[parseInt(Math.random()*keepStrategy.length)] || false;
+          // Maybe no strategy found
+          if (strategy != false) {
+            triggerPut(board_element, strategy.col, strategy.row);
+          }
+          return strategy;
         },
 
         /**
@@ -116,14 +119,18 @@ THE SOFTWARE.
           var boardString = dumpBoard(board);
 
           var stats = self.getStats(board_element, board);
+          var strategy;
+
           if (self.rewards[aiColor][boardString]) {
             // TODO: value function to evaluate more deeper
           } else {
-            self.randomAction(board_element, board, aiColor);
+            strategy = self.randomAction(board_element, board, aiColor);
           }
 
-          var newStats = self.getStats(board_element, board);
-          var reward = self.getReward(stats, newStats, aiColor);
+          if (strategy) {
+            var newStats = self.getStats(board_element, board);
+            var reward = self.getReward(stats, newStats, aiColor);
+          }
         },
 
         /**
@@ -207,12 +214,12 @@ THE SOFTWARE.
       $(this).unbind(EVENT_REVERSI_PUT);
       $(this).empty();
 
-      //styleの設定
+      // GUI / Style
       $(this).addClass('reversi_board');
       $(this).width(opts.width);
       $(this).height(opts.height);
 
-      /** Bidimensional Reversi Board */
+      // Bidimensional Reversi Board
       var board = initBoard(opts, this);
       $(this).data('board', board);
 
@@ -221,9 +228,9 @@ THE SOFTWARE.
       var _messageDialog = createMessageDialog(this, opts.width);
       var turn = CLASS_BLACK;
 
-      // What happens when the panel is pressed
+      // Event when a player
       $(this).bind(EVENT_REVERSI_PUT, function(e, data){
-        //ひっくり返せないので置けない。
+        // Skip when try to put on invalid position
         if(!canPut(board, turn, data.col, data.row)){
           showMessage(MESSAGE_CANT_PUT, _messagebar);
           return;
@@ -237,12 +244,11 @@ THE SOFTWARE.
           var black = $(this).find('.' + CLASS_BLACK).length;
           var white = $(this).find('.' + CLASS_WHITE).length;
 
-          // Determining the winner
+          // Display the winner
           var text = '<h2>' + ((black < white) ? 'White' : 'Black') +  ' win!! (' + black + ' / ' + white + ')</h2>';
-          if(black == white){
+          if(black == white) {
             text = '<h2>Draw game!</h2>';
           }
-
           showDialog(text, _messageDialog);
           return;
         }
@@ -264,11 +270,26 @@ THE SOFTWARE.
   };
 
   /**
-   * No more blank space left?
+   * Is the end of the game?
+   * Check for
+   *  - 0 blank spaces
+   *  - 0 pieces of a color
+   *  - no player can play in the last position
+   *
    * @returns Boolean
    */
   $.fn.reversi.isFinished = function(board_elements) {
-    return (0 == $(board_elements).find('.' + CLASS_BLANK).length);
+    var blank = $(board_elements).find('.' + CLASS_BLANK);
+    var board = $(board_elements).data('board');
+
+    return (0 == blank.length) ||
+           (0 == $(board_elements).find('.' + CLASS_WHITE).length) ||
+           (0 == $(board_elements).find('.' + CLASS_BLACK).length) ||
+           ( (blank.length == 1) ?
+              (!canPut(board, CLASS_BLACK, $(blank).attr('col'), $(blank).attr('row')) &&
+               !canPut(board, CLASS_WHITE, $(blank).attr('col'), $(blank).attr('row')))
+              : false
+           );
   }
 
   /**

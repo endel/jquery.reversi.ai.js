@@ -8,7 +8,7 @@ Take a look at this [live example](http://github.com/endel/)
 Screenshot
 ---
 
-![Alt text](https://github.com/yamitake/jquery.reversi.js/raw/master/WebContent/screenshot.png)
+![Alt text](https://github.com/endel/jquery.reversi.js/raw/master/screenshot.png)
 
 
 Authors

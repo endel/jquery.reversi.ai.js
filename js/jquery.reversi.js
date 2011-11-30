@@ -24,29 +24,91 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
  */
 (function($) {
-  /** Not placed any conditions on the cell */
-  var CLASS_BLANK = 'blank';
-  var CLASS_BLACK = 'black';
-  var CLASS_WHITE = 'white';
-
-  var CLASS_MESSAGE_BAR    = 'message_bar';
-  var CLASS_MESSAGE_DIALOG = 'message_dialog';
-
-  /** Event when a stone is placed */
-  var EVENT_REVERSI_PUT = 'reversi_put';
-
-  /** Alert message */
-  var MESSAGE_CANT_PUT  = 'It is not possible to put it there.';
-
-  /** Shared variables and methods */
   $.reversi = {
-    /* Artificial Intelligence */
-    ai: {
+    // Public Constants
+    const: {
+      /** Not placed any conditions on the cell */
+      CLASS_BLANK: 'blank',
+      CLASS_BLACK: 'black',
+      CLASS_WHITE: 'white',
+
+      CLASS_MESSAGE_BAR   : 'message_bar',
+      CLASS_MESSAGE_DIALOG: 'message_dialog',
+
+      /** Event when a stone is placed */
+      EVENT_REVERSI_PUT: 'reversi_put',
+
+      /** Alert message */
+      MESSAGE_CANT_PUT : 'It is not possible to put it there.'
+    },
+
+    // Public methods
+    methods: {
       /**
-       * Default reversi AI
-       * Priority to the edges or get a random action
+       * Whether you can specify the placement of stones
        *
-       * Implemented by yapr
+       * Stones placed conditions:
+       * Next match (vertical, horizontal, diagonal) with different colored stones,
+       * That his color on the diagonal.
+       */
+      canPut: function(board, class_color, col, row){
+        //isBlank
+        if(!board[col][row].hasClass($.reversi.const.CLASS_BLANK)){
+          return false;
+        }
+
+        var canReverseArray = new Array();
+
+        return ($.merge(canReverseArray, findReverseElements(board, class_color, col, row,  0, -1)).length ||
+                $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  0, -1)).length ||
+                $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  1, -1)).length ||
+                $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  1,  0)).length ||
+                $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  1,  1)).length ||
+                $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  0,  1)).length ||
+                $.merge(canReverseArray, findReverseElements(board, class_color, col, row, -1,  1)).length ||
+                $.merge(canReverseArray, findReverseElements(board, class_color, col, row, -1,  0)).length ||
+                $.merge(canReverseArray, findReverseElements(board, class_color, col, row, -1, -1)).length);
+      },
+
+      /**
+       * Trigger EVENT_REVERSI_PUT
+       */
+      triggerPut: function(board_element, col, row) {
+        return $(board_element).trigger($.reversi.const.EVENT_REVERSI_PUT, { 'col' : col, 'row' : row });
+      },
+
+      /**
+       * Is the end of the game?
+       * Check for
+       *  - 0 blank spaces
+       *  - 0 pieces of a color
+       *  - no player can play in the last position
+       *
+       * @returns Boolean
+       */
+      isFinished: function(board_elements) {
+        var blank = $(board_elements).find('.' + $.reversi.const.CLASS_BLANK);
+        var board = $(board_elements).data('board');
+
+        return (0 == blank.length) ||
+               (0 == $(board_elements).find('.' + $.reversi.const.CLASS_WHITE).length) ||
+               (0 == $(board_elements).find('.' + $.reversi.const.CLASS_BLACK).length) ||
+               ( (blank.length == 1) ?
+                  (!$.reversi.methods.canPut(board, $.reversi.const.CLASS_BLACK, $(blank).attr('col'), $(blank).attr('row')) &&
+                   !$.reversi.methods.canPut(board, $.reversi.const.CLASS_WHITE, $(blank).attr('col'), $(blank).attr('row')))
+                  : false
+               );
+      }
+
+
+    },
+
+    // Public Artificial Intelligence
+    ai: {
+
+      /**
+       * Default Reversi AI: implemented by yapr
+       * priority to the edges or get a random action
        */
       default: {
         action: function(board_element, board, aiColor) {
@@ -56,15 +118,15 @@ THE SOFTWARE.
           rows = board[0].length;
           for (var i = 0; i < cols; i++) {
             for (var k = 0; k < rows; k++) {
-              if (board[i][k].hasClass(CLASS_BLANK)) {
+              if (board[i][k].hasClass($.reversi.const.CLASS_BLANK)) {
                 // Keep in hands if there is a place to put
-                if (canPut(board, aiColor, i, k)) {
+                if ($.reversi.methods.canPut(board, aiColor, i, k)) {
                   // Priority to the edges
                   if ((i == 0 && k== 0) ||
                       (i == (cols - 1) && k == 0) ||
                       (i == (cols - 1) && k == (rows - 1)) ||
                       (i == 0 && k == (rows -1))) {
-                    return triggerPut(board_element, i, k);
+                    return $.reversi.methods.triggerPut(board_element, i, k);
                   }
                   keepStrategy[keepStrategy.length] = {col:i, row:k};
                 }
@@ -73,127 +135,19 @@ THE SOFTWARE.
           }
 
           var strategy = keepStrategy[parseInt(Math.random()*keepStrategy.length)];
-          setTimeout(function() { triggerPut(board_element, strategy.col, strategy.row) }, 300);
-        }
-      },
-
-      /*
-       * Reinforcement Learning AI
-       */
-      reinforcementLearning: {
-        rewards: { 'white': {}, 'black': {} },
-
-        /**
-         * Trigger to put piece at a random possible position
-         * It returns the position selected to act
-         * @return Object
-         */
-        randomAction: function(board_element, board, aiColor) {
-          var keepStrategy = new Array();
-          cols = board.length;
-          rows = board[0].length;
-          for (var i = 0; i < cols; i++) {
-            for (var k = 0; k < rows; k++) {
-              if (board[i][k].hasClass(CLASS_BLANK)) {
-                if (canPut(board, aiColor, i, k)) {
-                  keepStrategy[keepStrategy.length] = {col:i, row:k};
-                }
-              }
-            }
-          }
-          var strategy = keepStrategy[parseInt(Math.random()*keepStrategy.length)] || false;
           // Maybe no strategy found
           if (strategy != false) {
-            triggerPut(board_element, strategy.col, strategy.row);
+            setTimeout(function() { $.reversi.methods.triggerPut(board_element, strategy.col, strategy.row) }, 300);
           }
-          return strategy;
-        },
-
-        /**
-         * Act using Reinforcement Learning
-         * If knoweledge database isn't prepared, populate it using random actions
-         */
-        action: function(board_element, board, aiColor) {
-          var self = $.reversi.ai.reinforcementLearning;
-
-          var boardString = dumpBoard(board);
-
-          var stats = self.getStats(board_element, board);
-          var strategy;
-
-          if (self.rewards[aiColor][boardString]) {
-            // TODO: value function to evaluate more deeper
-          } else {
-            strategy = self.randomAction(board_element, board, aiColor);
-          }
-
-          if (strategy) {
-            var newStats = self.getStats(board_element, board);
-            var reward = self.getReward(stats, newStats, aiColor);
-          }
-        },
-
-        /**
-         * getStats
-         * return count stats of black / white pieces on the board
-         *
-         *  Containing
-         *    - count total pieces of each color on the board
-         *    - count edge pieces of each color
-         *    - count corner pieces of each color
-         *
-         * @return Object
-         */
-        getStats: function(board_element, board) {
-          var stats = {};
-          var colors = [CLASS_WHITE, CLASS_BLACK];
-
-          var cols = board.length;
-          var rows = board[0].length;
-
-          for (var i=0;i<colors.length;i++) {
-            var color = colors[i];
-            stats[color] = {
-              total: $(board_element).find('.' + CLASS_WHITE).length,
-              edges: $(board_element).find("." + color + "[col=0], ." + color + "[row=0], ." + color + "[col="+cols+"], ." + color + "[row="+rows+"]").length,
-              corners: $(board_element).find("." + color + "[col=0][row=0], ." + color + "[col="+(cols-1)+"][row="+(rows-1)+"]").length
-            }
-          }
-          return stats;
-        },
-
-        /**
-         * Calculate the difference between stats returned by getStats
-         * @return Object
-         */
-        diffStats: function(previousColorStats, afterColorStats) {
-          return {
-            total: previousColorStats.total - afterColorStats.total,
-            edges: previousColorStats.edges - afterColorStats.edges,
-            corners: previousColorStats.corners - afterColorStats.corners
-          }
-        },
-
-        /**
-         * Estimate a reward for the choice made by A.I.
-         * @return Number
-         */
-        getReward: function(previousStats, afterStats, aiColor) {
-          var self = $.reversi.ai.reinforcementLearning;
-          var otherColor = (aiColor == CLASS_BLACK) ? CLASS_WHITE : CLASS_BLACK;
-
-          var aiStats = self.diffStats(previousStats[aiColor], afterStats[aiColor]);
-          var otherStats = self.diffStats(previousStats[otherColor], afterStats[otherColor]);
-
-          // TODO
-          // return (aiStats / );
         }
-
       }
     }
   }
 
-  /* Reversi Implementation */
+
+  /*
+   * Reversi Implementation
+   */
   $.fn.reversi = function(options){
     /**
      * Default options
@@ -211,7 +165,7 @@ THE SOFTWARE.
       var opts = $.extend(defaults, options);
 
       // Clear previous data
-      $(this).unbind(EVENT_REVERSI_PUT);
+      $(this).unbind($.reversi.const.EVENT_REVERSI_PUT);
       $(this).empty();
 
       // GUI / Style
@@ -226,13 +180,13 @@ THE SOFTWARE.
       // infomation display component
       var _messagebar = createMessageBar(this, opts.width);
       var _messageDialog = createMessageDialog(this, opts.width);
-      var turn = CLASS_BLACK;
+      var turn = $.reversi.const.CLASS_BLACK;
 
       // Event when a player
-      $(this).bind(EVENT_REVERSI_PUT, function(e, data){
+      $(this).bind($.reversi.const.EVENT_REVERSI_PUT, function(e, data){
         // Skip when try to put on invalid position
-        if(!canPut(board, turn, data.col, data.row)){
-          showMessage(MESSAGE_CANT_PUT, _messagebar);
+        if(!$.reversi.methods.canPut(board, turn, data.col, data.row)){
+          showMessage($.reversi.const.MESSAGE_CANT_PUT, _messagebar);
           return;
         }
 
@@ -240,9 +194,9 @@ THE SOFTWARE.
         upsets(board, turn, data.col, data.row);
 
         // Termination decision
-        if($.fn.reversi.isFinished(this)){
-          var black = $(this).find('.' + CLASS_BLACK).length;
-          var white = $(this).find('.' + CLASS_WHITE).length;
+        if($.reversi.methods.isFinished(this)){
+          var black = $(this).find('.' + $.reversi.const.CLASS_BLACK).length;
+          var white = $(this).find('.' + $.reversi.const.CLASS_WHITE).length;
 
           // Display the winner
           var text = '<h2>' + ((black < white) ? 'White' : 'Black') +  ' win!! (' + black + ' / ' + white + ')</h2>';
@@ -254,7 +208,7 @@ THE SOFTWARE.
         }
 
         // Change in opponent's turn
-        turn = nextTurn(board, (turn == CLASS_BLACK) ? CLASS_WHITE : CLASS_BLACK, _messagebar);
+        turn = nextTurn(board, (turn == $.reversi.const.CLASS_BLACK) ? $.reversi.const.CLASS_WHITE : $.reversi.const.CLASS_BLACK, _messagebar);
         $(this).attr('turn', turn);
 
         if(opts.ai != false && turn != opts.my_color){
@@ -263,34 +217,12 @@ THE SOFTWARE.
       });
 
       // If the white sails
-      if(opts.ai != false && opts.my_color == CLASS_WHITE){
+      if(opts.ai != false && opts.my_color == $.reversi.const.CLASS_WHITE){
         opts.ai.action.apply(this, [this, board, turn]);
       }
     });
   };
 
-  /**
-   * Is the end of the game?
-   * Check for
-   *  - 0 blank spaces
-   *  - 0 pieces of a color
-   *  - no player can play in the last position
-   *
-   * @returns Boolean
-   */
-  $.fn.reversi.isFinished = function(board_elements) {
-    var blank = $(board_elements).find('.' + CLASS_BLANK);
-    var board = $(board_elements).data('board');
-
-    return (0 == blank.length) ||
-           (0 == $(board_elements).find('.' + CLASS_WHITE).length) ||
-           (0 == $(board_elements).find('.' + CLASS_BLACK).length) ||
-           ( (blank.length == 1) ?
-              (!canPut(board, CLASS_BLACK, $(blank).attr('col'), $(blank).attr('row')) &&
-               !canPut(board, CLASS_WHITE, $(blank).attr('col'), $(blank).attr('row')))
-              : false
-           );
-  }
 
   /**
    * Initialization of the board
@@ -312,14 +244,14 @@ THE SOFTWARE.
     for(var i = 0; i < cols; i++){
       board[i] = [];
       for(var k = 0; k < rows; k++){
-        var style_name = CLASS_BLANK;
+        var style_name = $.reversi.const.CLASS_BLANK;
 
         // ○●
         // ●○
         if((i == (cols / 2) - 1 && k == (rows / 2) - 1)  || (i == (cols / 2) && k == (rows / 2))){
-          style_name = CLASS_BLACK;
+          style_name = $.reversi.const.CLASS_BLACK;
         }else if((i == (cols / 2) - 1 && k == (rows / 2)) || (i == (cols / 2) && k == (rows / 2) - 1)){
-          style_name = CLASS_WHITE;
+          style_name = $.reversi.const.CLASS_WHITE;
         }
 
         board[i][k] = $("<div/>", {
@@ -334,7 +266,7 @@ THE SOFTWARE.
     $(board_element).click(function(e){
       var target = $(e.target);
 
-      target.parent().trigger(EVENT_REVERSI_PUT,
+      target.parent().trigger($.reversi.const.EVENT_REVERSI_PUT,
                               {
                                 'col' : target.attr('col'),
                                 'row' : target.attr('row')
@@ -350,7 +282,7 @@ THE SOFTWARE.
    */
   function upsets(board, style_name, col, row){
     var firstPut = board[col][row];
-    firstPut.removeClass(CLASS_BLANK);
+    firstPut.removeClass($.reversi.const.CLASS_BLANK);
     firstPut.addClass(style_name);
 
     var reverseElements = new Array();
@@ -377,9 +309,9 @@ THE SOFTWARE.
     rows = board[0].length;
     for(var i = 0; i < cols; i++){
       for(var k = 0; k < cols; k++){
-        if(board[i][k].hasClass(CLASS_BLANK)){
+        if(board[i][k].hasClass($.reversi.const.CLASS_BLANK)){
           // If the place had become a party to turn
-          if(canPut(board, nextTurnColor, i, k)){
+          if($.reversi.methods.canPut(board, nextTurnColor, i, k)){
             return nextTurnColor;
           }
         }
@@ -388,58 +320,9 @@ THE SOFTWARE.
 
     //path
     showMessage(nextTurnColor + ' path.', _messagebar);
-    return (nextTurnColor == CLASS_BLACK) ? CLASS_WHITE : CLASS_BLACK;
+    return (nextTurnColor == $.reversi.const.CLASS_BLACK) ? $.reversi.const.CLASS_WHITE : $.reversi.const.CLASS_BLACK;
   }
 
-  /**
-   * Convert board data into String
-   * Used on Artificial Intelligence to map learning
-   */
-  function dumpBoard(board) {
-    var columns = [];
-    var ncols = board.length;
-    for(var i = 0; i < ncols; i++){
-      var lines = []
-      var nrows = board[i].length;
-      for(var j = 0; j < nrows; j++){
-        var color = 0;
-        if (board[i][j].hasClass(CLASS_BLACK)) {
-          color = 1;
-        } else if (board[i][j].hasClass(CLASS_WHITE)) {
-          color = 2;
-        }
-        lines.push(color)
-      }
-      columns.push(lines)
-    }
-    return columns.toString();
-  }
-
-  /**
-   * Whether you can specify the placement of stones
-   *
-   * Stones placed conditions:
-   * Next match (vertical, horizontal, diagonal) with different colored stones,
-   * That his color on the diagonal.
-   */
-  function canPut(board, class_color, col, row){
-    //isBlank
-    if(!board[col][row].hasClass(CLASS_BLANK)){
-      return false;
-    }
-
-    var canReverseArray = new Array();
-
-    return ($.merge(canReverseArray, findReverseElements(board, class_color, col, row,  0, -1)).length ||
-            $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  0, -1)).length ||
-            $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  1, -1)).length ||
-            $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  1,  0)).length ||
-            $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  1,  1)).length ||
-            $.merge(canReverseArray, findReverseElements(board, class_color, col, row,  0,  1)).length ||
-            $.merge(canReverseArray, findReverseElements(board, class_color, col, row, -1,  1)).length ||
-            $.merge(canReverseArray, findReverseElements(board, class_color, col, row, -1,  0)).length ||
-            $.merge(canReverseArray, findReverseElements(board, class_color, col, row, -1, -1)).length);
-  }
 
   /**
    * From the specified position and direction favored
@@ -465,7 +348,7 @@ THE SOFTWARE.
 
        // If it has the same adjacent stones
        var div = board[col][row];
-       if(div.hasClass(CLASS_BLANK)
+       if(div.hasClass($.reversi.const.CLASS_BLANK)
           || (i == 1 && div.hasClass(style_name))){
             break;
           }
@@ -484,20 +367,13 @@ THE SOFTWARE.
   }
 
   /**
-   * Trigger EVENT_REVERSI_PUT
-   */
-  function triggerPut(board_element, col, row) {
-    return $(board_element).trigger(EVENT_REVERSI_PUT, { 'col' : col, 'row' : row });
-  }
-
-  /**
    * To generate the message area
    * @returns Element
    */
   function createMessageBar(board_element, width){
     //statusmessage
     return $("<div/>", {
-      "class": CLASS_MESSAGE_BAR,
+      "class": $.reversi.const.CLASS_MESSAGE_BAR,
       "style": "display:none;width:" + eval(width - 8) + "px;"
     }).appendTo(board_element);
   }
@@ -508,7 +384,7 @@ THE SOFTWARE.
   function createMessageDialog(board_element, width){
     //statusmessage
     return $("<div/>", {
-      "class": CLASS_MESSAGE_DIALOG,
+      "class": $.reversi.const.CLASS_MESSAGE_DIALOG,
       "style": "display:none;width:" + width * 2/3 + "px;left:" + width / 6  + "px;"
     }).appendTo(board_element);
   }
@@ -526,7 +402,7 @@ THE SOFTWARE.
    * To display the dialog.
    */
   function showDialog(text, elem){
-    $(elem).closest("." + CLASS_MESSAGE_DIALOG)
+    $(elem).closest("." + $.reversi.const.CLASS_MESSAGE_DIALOG)
     .stop()
     .css("opacity", 1)
     .html(text)

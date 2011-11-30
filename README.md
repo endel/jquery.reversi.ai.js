@@ -1,20 +1,20 @@
-Reversi AI
+Reinforcement Learning for Reversi Game
 ===
 
-Classical Reversi game with Reinforcement Learning Artificial Intelligence
+Machine Learning implementation for classical Reversi Game.
 
-Take a look at this [live example](http://github.com/endel/)
+Take a look at the [live example](http://endel.github.com/jquery.reversi.ai.js)
 
 Screenshot
 ---
 
-![Alt text](https://github.com/endel/jquery.reversi.js/raw/master/screenshot.png)
+![Reversi Game Screenshot](https://github.com/endel/jquery.reversi.ai.js/raw/master/screenshot.png)
 
 
 Authors
 ---
 
-Artificial Intelligence: [Endel Dreyer](https://github.com/endel)
+Reinforcement Learning: [Endel Dreyer](https://github.com/endel)
 
 JavaScript jQuery Game: [Jun Takeno](https://github.com/yamitake)
 

@@ -98,12 +98,38 @@ THE SOFTWARE.
                    !$.reversi.methods.canPut(board, $.reversi.const.CLASS_WHITE, $(blank).attr('col'), $(blank).attr('row')))
                   : false
                );
+      },
+
+      /**
+       * Place the stone upside down around the stone.
+       */
+      upsets: function(board, style_name, col, row){
+        var firstPut = board[col][row];
+        firstPut.removeClass($.reversi.const.CLASS_BLANK);
+        firstPut.addClass(style_name);
+
+        var reverseElements = new Array();
+        $.merge(reverseElements, findReverseElements(board, style_name, col, row,  0, -1, false));
+        $.merge(reverseElements, findReverseElements(board, style_name, col, row,  1, -1, false));
+        $.merge(reverseElements, findReverseElements(board, style_name, col, row,  1,  0, false));
+        $.merge(reverseElements, findReverseElements(board, style_name, col, row,  1,  1, false));
+        $.merge(reverseElements, findReverseElements(board, style_name, col, row,  0,  1, false));
+        $.merge(reverseElements, findReverseElements(board, style_name, col, row, -1,  1, false));
+        $.merge(reverseElements, findReverseElements(board, style_name, col, row, -1,  0, false));
+        $.merge(reverseElements, findReverseElements(board, style_name, col, row, -1, -1, false));
+
+        $(reverseElements).each(function(){
+          this.attr('class', style_name);
+        });
       }
 
 
     },
 
-    // Public Artificial Intelligence
+    /**
+     * Artificial Intelligence Agents:
+     * Must implement 'action' method, calling Reversi triggetPut method to proceed the game
+     */
     ai: {
 
       /**
@@ -186,12 +212,12 @@ THE SOFTWARE.
       $(this).bind($.reversi.const.EVENT_REVERSI_PUT, function(e, data){
         // Skip when try to put on invalid position
         if(!$.reversi.methods.canPut(board, turn, data.col, data.row)){
-          showMessage($.reversi.const.MESSAGE_CANT_PUT, _messagebar);
+          //showMessage($.reversi.const.MESSAGE_CANT_PUT, _messagebar);
           return;
         }
 
         // Place the stone
-        upsets(board, turn, data.col, data.row);
+        $.reversi.methods.upsets(board, turn, data.col, data.row);
 
         // Termination decision
         if($.reversi.methods.isFinished(this)){
@@ -275,29 +301,6 @@ THE SOFTWARE.
     });
 
     return board;
-  }
-
-  /**
-   * Place the stone upside down around the stone.
-   */
-  function upsets(board, style_name, col, row){
-    var firstPut = board[col][row];
-    firstPut.removeClass($.reversi.const.CLASS_BLANK);
-    firstPut.addClass(style_name);
-
-    var reverseElements = new Array();
-    $.merge(reverseElements, findReverseElements(board, style_name, col, row,  0, -1, false));
-    $.merge(reverseElements, findReverseElements(board, style_name, col, row,  1, -1, false));
-    $.merge(reverseElements, findReverseElements(board, style_name, col, row,  1,  0, false));
-    $.merge(reverseElements, findReverseElements(board, style_name, col, row,  1,  1, false));
-    $.merge(reverseElements, findReverseElements(board, style_name, col, row,  0,  1, false));
-    $.merge(reverseElements, findReverseElements(board, style_name, col, row, -1,  1, false));
-    $.merge(reverseElements, findReverseElements(board, style_name, col, row, -1,  0, false));
-    $.merge(reverseElements, findReverseElements(board, style_name, col, row, -1, -1, false));
-
-    $(reverseElements).each(function(){
-      this.attr('class', style_name);
-    });
   }
 
   /**

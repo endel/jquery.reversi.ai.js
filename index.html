@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <link href="css/jquery.reversi.css" rel="stylesheet" type="text/css" media="all">
-    <title>Reversi Artificial Intelligence | jquery.reversi.ai.js</title>
+    <title>Reversi: Reinforcement Learning | jquery.reversi.ai.js</title>
 
     <script type="text/javascript" src="http://www.google.com/jsapi"></script>
     <script type="text/javascript">google.load("jquery", "1.4.0");</script>
@@ -43,52 +43,110 @@
           }
         }
 
+        $('#learned-data').hide();
+        $('button#dump').click(function() {
+          $('#learned-data').slideDown();
+          $('#dump-reward').val(JSON.stringify($.reversi.ai.reinforcementLearning.rewards));
+        });
         $('button#learn').click(playNextTurn);
         $('button#new-game').click(newGame);
         $('button#new-game').click();
       });
     </script>
+
+    <style>
+      /* ------------------------------------------------------------------------------------------------------------- RESET */
+      html, body, div, form, p,
+      code, pre { margin: 0; padding: 0; border: 0; vertical-align: baseline; }
+      /* ------------------------------------------------------------------------------------------------------------- TEMPLATE */
+
+      body { font: 12pt sans-serif; color: #444; background: #eee; }
+
+      a { color: #980905; }
+      a:hover, a:focus, a:active { text-decoration: none; }
+
+      h1 { margin: 0 0 0.5em; font-size: 36px; }
+      h2 { margin: 0 0 0.75em; font-size: 22px; }
+      h3 { margin: 0 0 0.333em; font-size: 16px; font-weight: normal; }
+      p { margin: 0 0 1.333em; }
+      em { font-style: italic; }
+      table { border-collapse: separate; border-spacing: 0; margin: 0; vertical-align: middle; }
+      th { font-weight: bold; }
+      th, td { padding: 5px 25px 5px 5px; text-align: left; vertical-align: middle; }
+      pre, code { font-family: monospace, sans-serif; font-size: 1em; color:#080; }
+
+      /* ------------------------------------------------------------------------------------------------------------- TEMPLATE */
+
+      .container { position:relative; overflow:hidden; width: 510px; padding: 40px 60px; border: 1px solid #ccc; margin: 40px auto 20px; background: #fff; -webkit-box-shadow: 0 0 15px rgba(0,0,0,0.1); -moz-box-shadow: 0 0 15px rgba(0,0,0,0.1); box-shadow: 0 0 15px rgba(0,0,0,0.1); }
+
+      .container pre,
+      .container .prettyprint { padding: 0; border: 0; margin: 0 0 20px; font-size: 13px; background: #fff; }
+      .container .options { font-size: 13px; }
+
+      .ribbon { position: absolute; top: -1px; right: -1px; opacity: 0.9; }
+      .ribbon:hover, .ribbon:focus, .ribbon:active { opacity: 1; }
+      .ribbon img { display: block; border: 0; }
+
+      .header { padding-right:80px; }
+
+      .section { margin: 40px 0 20px; }
+
+      .example { padding: 20px; border: 1px solid #ccc; margin: 10px -20px 20px; }
+
+      .footer { margin: 26px 0 50px; font-size: 1em; color: #666; text-align: center; }
+      .footer a { color: #666; }
+    </style>
+
   </head>
   <body>
-    <div id="wrapper">
-      <div id="header">
-        <h1>
-          <a id="top" href="http://endel.me/">
-            Endel Dreyer | Reversi Artificial Intelligence
-          </a>
-        </h1>
-      </div>
+    <div class="container">
+    <a class="ribbon" href="http://github.com/endel/jquery.reversi.ai.js" target="_blank"><img src="http://s3.amazonaws.com/github/ribbons/forkme_right_red_aa0000.png" alt="Fork me on GitHub"></a>
 
-
-      <h2>jquery.reversi.ai.js</h2>
-      <p>
-        Machine Learning Implementation:
-        <a href="https://github.com/endel/jquery.reversi.ai.js">https://github.com/endel/jquery.reversi.ai.js</a>
-
-        <br />
-        Original Reversi Script:
-        <a href="https://github.com/yamitake/jquery.reversi.js">https://github.com/yamitake/jquery.reversi.js</a>
-      </p>
-
-      <h2>Reinforcement Learning</h2>
-      <div id="options">
+    <div class="header">
+        <h1>Reversi: Reinforcement Learning</h1>
+        <p>
+          Machine Learning implementation for classical Reversi Game.
+        </p>
+    </div>
+    <div class="section">
+      <div class="options">
         <p>
           Learn iterations: <input type="text" id="iterations" value="50" size="2" />
-          Milliseconds by turn: <input type="text" id="milliseconds" value="0" size="2" />
+          wait milliseconds/turn: <input type="text" id="milliseconds" value="0" size="2" />
           <button id="learn">Learn!</button>
-          <br />
+          <button id="dump">Show learned data</button>
+        </p>
+        <p>
           <button id="new-game">New game</button>
         </p>
       </div>
-      <div id="reversi"></div>
 
-      <div id="footer">
-        <p>
-          Copyright (C) Endel Dreyer All Rights Reserved.
-        </p>
+      <div id="learned-data">
+        <h3>Reward dump:</h3>
+        <textarea id="dump-reward" rows="8" cols="70"></textarea>
       </div>
+
+      <div id="reversi"></div>
+    </div>
+
+    <div class="section">
+        <h2>Browser compatibility</h2>
+        <p>Only tested on Chrome, Firefox and Safari.</p>
+    </div>
+
+    <div class="section">
+        <h2>Acknowledgements</h2>
+
+        <p>Based on <a href="https://github.com/yamitake/jquery.reversi.js">jQuery Reversi</a> by <a href="https://github.com/yamitake/">Yapr</a></p>
+    </div>
+</div>
+
+<div class="footer">
+    <a href="http://github.com/endel/jquery.reversi.ai.js">jquery.reversi.ai.js</a> by <a href="http://endel.me" title="Personal Endel Dreyer Website">Endel Dreyer</a>.
+</div>
+
+</body>
+</html>
     </div>
   </body>
 </html>
-
-
